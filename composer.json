@@ -28,6 +28,11 @@
       "APIToolkit\\": "src/"
     }
   },
+  "autoload-dev": {
+    "psr-4": {
+      "APIToolkit\\Tests\\": "tests/"
+    }
+  },
   "extra": {
     "laravel": {
       "providers": [

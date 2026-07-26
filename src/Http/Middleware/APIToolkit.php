@@ -3,13 +3,13 @@
 namespace APIToolkit\Http\Middleware;
 
 use Illuminate\Support\Facades\Log;
-use OpenTelemetry\SDK\Trace\TracerProvider;
+use OpenTelemetry\API\Trace\TracerProviderInterface;
 use OpenTelemetry\API\Globals;
+use OpenTelemetry\SDK\Trace\Span;
 use Illuminate\Http\Request;
 use Closure;
-use Exception;
 use Ramsey\Uuid\Uuid;
-use  Apitoolkit\Common\Shared;
+use Apitoolkit\Common\Shared;
 
 class APIToolkit
 {
@@ -21,7 +21,7 @@ class APIToolkit
   private ?string $serviceVersion;
   private ?string $serviceName;
   private array $tags = [];
-  private TracerProvider $tracerProvider;
+  private TracerProviderInterface $tracerProvider;
 
   public function __construct()
   {
@@ -90,6 +90,11 @@ class APIToolkit
       $responseBody = $response->getContent();
     }
     unset($query['apitoolkitData']);
+
+    if (!$span instanceof Span) {
+      return;
+    }
+
     Shared::setAttributes(
       $span,
       $request->getHttpHost(),
@@ -113,8 +118,4 @@ class APIToolkit
       Log::debug("APIToolkit: payload sent");
     }
   }
-}
-
-class InvalidClientMetadataException extends Exception
-{
 }

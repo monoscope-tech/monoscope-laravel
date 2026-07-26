@@ -11,7 +11,7 @@
          failOnWarning="true">
     <testsuites>
         <testsuite name="default">
-            <directory>src</directory>
+            <directory>tests</directory>
         </testsuite>
     </testsuites>
 
