@@ -41,7 +41,7 @@
     "ext-json": "*",
     "ramsey/uuid": "^4.7",
     "open-telemetry/api": "^1.1",
-    "apitoolkit/common": "^1.0"
+    "apitoolkit/common": "^1.0.7"
   },
   "require-dev": {
     "orchestra/testbench": "^8.10",

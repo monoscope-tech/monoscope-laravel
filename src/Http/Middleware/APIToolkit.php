@@ -3,7 +3,7 @@
 namespace APIToolkit\Http\Middleware;
 
 use Illuminate\Support\Facades\Log;
-use OpenTelemetry\SDK\Trace\TracerProvider;
+use OpenTelemetry\API\Trace\TracerProviderInterface;
 use OpenTelemetry\API\Globals;
 use Illuminate\Http\Request;
 use Closure;
@@ -21,7 +21,7 @@ class APIToolkit
   private ?string $serviceVersion;
   private ?string $serviceName;
   private array $tags = [];
-  private TracerProvider $tracerProvider;
+  private TracerProviderInterface $tracerProvider;
 
   public function __construct()
   {

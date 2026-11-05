@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ff2b6f1d43d5745b4cf3443d5874c077",
+    "content-hash": "1ee87820745cd0e3d693764782433fe6",
     "packages": [
         {
             "name": "apitoolkit/common",
-            "version": "v1.0.5",
+            "version": "v1.0.7",
             "source": {
                 "type": "git",
-                "url": "https://github.com/apitoolkit/apitoolkit-php.git",
-                "reference": "101928ed5dcf601bc304e3ff481401a0693a90a7"
+                "url": "https://github.com/monoscope-tech/apitoolkit-php.git",
+                "reference": "06fad02189fd574b5c9d463ea92ac6e8f578f1df"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/apitoolkit/apitoolkit-php/zipball/101928ed5dcf601bc304e3ff481401a0693a90a7",
-                "reference": "101928ed5dcf601bc304e3ff481401a0693a90a7",
+                "url": "https://api.github.com/repos/monoscope-tech/apitoolkit-php/zipball/06fad02189fd574b5c9d463ea92ac6e8f578f1df",
+                "reference": "06fad02189fd574b5c9d463ea92ac6e8f578f1df",
                 "shasum": ""
             },
             "require": {
@@ -25,6 +25,9 @@
                 "guzzlehttp/guzzle": "^7.0",
                 "open-telemetry/api": "^1.0",
                 "open-telemetry/sdk": "^1.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^10.5"
             },
             "type": "library",
             "autoload": {
@@ -44,10 +47,10 @@
             ],
             "description": "API Toolkit Common Library",
             "support": {
-                "issues": "https://github.com/apitoolkit/apitoolkit-php/issues",
-                "source": "https://github.com/apitoolkit/apitoolkit-php/tree/v1.0.5"
+                "issues": "https://github.com/monoscope-tech/apitoolkit-php/issues",
+                "source": "https://github.com/monoscope-tech/apitoolkit-php/tree/v1.0.7"
             },
-            "time": "2025-01-06T14:32:18+00:00"
+            "time": "2026-11-05T17:56:46+00:00"
         },
         {
             "name": "brick/math",
@@ -8642,5 +8645,5 @@
         "ext-json": "*"
     },
     "platform-dev": [],
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.3.0"
 }
