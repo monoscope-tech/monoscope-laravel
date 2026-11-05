@@ -10,10 +10,12 @@ class APIToolkitServiceProvider extends ServiceProvider
 {
   public function register()
   {
+    $this->mergeConfigFrom(__DIR__ . '/../../config/apitoolkit.php', 'apitoolkit');
   }
 
   public function boot()
   {
+    $this->publishes([__DIR__ . '/../../config/apitoolkit.php' => config_path('apitoolkit.php')], 'config');
   }
 }
 

@@ -114,6 +114,28 @@ Route::get('/', function () {
 })->middleware('apitoolkit');
 ```
 
+### Configuration
+
+The middleware reads its settings from `config/apitoolkit.php`, so they keep working after `php artisan config:cache`. By default that file reads these environment variables (lists are comma-separated):
+
+```sh
+APITOOLKIT_SERVICE_NAME=my-service
+APITOOLKIT_SERVICE_VERSION=1.0.0
+APITOOLKIT_TAGS=prod,eu
+APITOOLKIT_REDACT_HEADERS=X-Api-Key,X-Session
+APITOOLKIT_REDACT_REQUEST_BODY=$.password,$.card.number
+APITOOLKIT_REDACT_RESPONSE_BODY=$.token
+APITOOLKIT_CAPTURE_REQUEST_BODY=false
+APITOOLKIT_CAPTURE_RESPONSE_BODY=false
+APITOOLKIT_DEBUG=false
+```
+
+To change the config file itself, publish it:
+
+```sh
+php artisan vendor:publish --provider="APIToolkit\Provider\APIToolkitServiceProvider"
+```
+
 > [!NOTE]
 >
 > The `{ENTER_YOUR_API_KEY_HERE}` demo string should be replaced with the [API key](https://apitoolkit.io/docs/dashboard/settings-pages/api-keys?utm_campaign=devrel&utm_medium=github&utm_source=sdks_readme) generated from the APItoolkit dashboard.

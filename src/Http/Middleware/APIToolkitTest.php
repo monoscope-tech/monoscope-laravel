@@ -4,6 +4,7 @@ namespace APIToolkit\Http\Middleware;
 
 use Orchestra\Testbench\TestCase;
 use APIToolkit\Http\Middleware\APIToolkit;
+use APIToolkit\Provider\APIToolkitServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Mockery;
@@ -22,6 +23,11 @@ use Ramsey\Uuid\Uuid;
  */
 class APIToolkitTest extends TestCase
 {
+  protected function getPackageProviders($app)
+  {
+    return [APIToolkitServiceProvider::class];
+  }
+
   // Define environment setup
   protected function getEnvironmentSetUp($app)
   {
@@ -114,12 +120,9 @@ class APIToolkitTest extends TestCase
       ->assertJson(json_decode($testJSON, true));
   }
 
-  public function test_redacts_headers_and_bodies_from_env_lists(): void
+  // Sends a login request through the middleware and returns the exported span attributes.
+  private function loginSpanAttributes(): array
   {
-    // The documented .env format is a comma-separated string.
-    putenv('APITOOLKIT_REDACT_HEADERS=X-Api-Key, X-Other');
-    putenv('APITOOLKIT_REDACT_REQUEST_BODY=$.password, $.pin');
-    putenv('APITOOLKIT_CAPTURE_REQUEST_BODY=true');
     $exporter = new InMemoryExporter();
     $scope = Configurator::create()->withTracerProvider(new TracerProvider(new SimpleSpanProcessor($exporter)))->activate();
     try {
@@ -130,13 +133,14 @@ class APIToolkitTest extends TestCase
         'HTTP_ACCEPT' => 'text/plain',
         'CONTENT_TYPE' => 'application/json',
       ], '{"password":"p","pin":"1","user":"u"}')->assertOk();
-      $attrs = $exporter->getSpans()[0]->getAttributes()->toArray();
+      return $exporter->getSpans()[0]->getAttributes()->toArray();
     } finally {
       $scope->detach();
-      putenv('APITOOLKIT_REDACT_HEADERS');
-      putenv('APITOOLKIT_REDACT_REQUEST_BODY');
-      putenv('APITOOLKIT_CAPTURE_REQUEST_BODY');
     }
+  }
+
+  private function assertRedacted(array $attrs): void
+  {
     foreach (['request.header.authorization', 'request.header.x-api-key', 'response.header.set-cookie'] as $h) {
       $this->assertSame('[CLIENT_REDACTED]', $attrs["http.$h"], $h);
     }
@@ -144,8 +148,41 @@ class APIToolkitTest extends TestCase
     $this->assertJsonStringEqualsJsonString('{"password":"[CLIENT_REDACTED]","pin":"[CLIENT_REDACTED]","user":"u"}', base64_decode($attrs['http.request.body']));
   }
 
+  public function test_redacts_headers_and_bodies_from_env_lists(): void
+  {
+    // The documented .env format is a comma-separated string, read when the app boots.
+    putenv('APITOOLKIT_REDACT_HEADERS=X-Api-Key, X-Other');
+    putenv('APITOOLKIT_REDACT_REQUEST_BODY=$.password, $.pin');
+    putenv('APITOOLKIT_CAPTURE_REQUEST_BODY=true');
+    try {
+      $this->refreshApplication();
+      $this->assertSame(['X-Api-Key', 'X-Other'], config('apitoolkit.redactHeaders'));
+      $this->assertRedacted($this->loginSpanAttributes());
+    } finally {
+      putenv('APITOOLKIT_REDACT_HEADERS');
+      putenv('APITOOLKIT_REDACT_REQUEST_BODY');
+      putenv('APITOOLKIT_CAPTURE_REQUEST_BODY');
+    }
+  }
 
+  public function test_reads_settings_from_config_without_env(): void
+  {
+    // After `php artisan config:cache` env() returns null, so only config() carries the settings.
+    config([
+      'apitoolkit.redactHeaders' => ['X-Api-Key'],
+      'apitoolkit.redactRequestBody' => ['$.password', '$.pin'],
+      'apitoolkit.captureRequestBody' => true,
+    ]);
+    $this->assertRedacted($this->loginSpanAttributes());
+  }
 
-
-
+  public function test_constructor_creates_no_dynamic_properties(): void
+  {
+    set_error_handler(fn($no, $msg) => throw new \ErrorException($msg, 0, $no), E_DEPRECATED);
+    try {
+      $this->assertInstanceOf(APIToolkit::class, new APIToolkit());
+    } finally {
+      restore_error_handler();
+    }
+  }
 }
