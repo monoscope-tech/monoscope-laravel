@@ -21,31 +21,24 @@ class APIToolkit
   private ?string $serviceVersion;
   private ?string $serviceName;
   private array $tags = [];
+  private bool $captureRequestBody = false;
+  private bool $captureResponseBody = false;
+  private array $config = [];
   private TracerProviderInterface $tracerProvider;
 
   public function __construct()
   {
-    $list = fn($key) => array_values(array_filter(array_map('trim', explode(",", env($key, "")))));
-    $this->tags = $list('APITOOLKIT_TAGS');
-    $this->serviceVersion = env('APITOOLKIT_SERVICE_VERSION', null);
-    $this->serviceName = env('APITOOLKIT_SERVICE_NAME', "");
-    $this->redactHeaders = $list('APITOOLKIT_REDACT_HEADERS');
-    $this->redactRequestBody = $list('APITOOLKIT_REDACT_REQUEST_BODY');
-    $this->redactResponseBody = $list('APITOOLKIT_REDACT_RESPONSE_BODY');
-    $this->captureRequestBody = env('APITOOLKIT_CAPTURE_REQUEST_BODY', false);
-    $this->captureResponseBody = env('APITOOLKIT_CAPTURE_RESPONSE_BODY', false);
-    $this->debug = env('APITOOLKIT_DEBUG', false);
-    $this->config = [
-      'redactHeaders' => $this->redactHeaders,
-      'redactRequestBody' => $this->redactRequestBody,
-      'redactResponseBody' => $this->redactResponseBody,
-      'serviceVersion' => $this->serviceVersion,
-      'tags' => $this->tags,
-      'captureRequestBody' => $this->captureRequestBody,
-      'captureResponseBody' => $this->captureResponseBody,
-      'debug' => $this->debug,
-      'serviceName' => $this->serviceName,
-    ];
+    // Read via config() so values survive `php artisan config:cache`; fall back to the defaults if the provider isn't loaded.
+    $this->config = config('apitoolkit') ?? require __DIR__ . '/../../../config/apitoolkit.php';
+    $this->tags = $this->config['tags'];
+    $this->serviceVersion = $this->config['serviceVersion'];
+    $this->serviceName = $this->config['serviceName'];
+    $this->redactHeaders = $this->config['redactHeaders'];
+    $this->redactRequestBody = $this->config['redactRequestBody'];
+    $this->redactResponseBody = $this->config['redactResponseBody'];
+    $this->captureRequestBody = $this->config['captureRequestBody'];
+    $this->captureResponseBody = $this->config['captureResponseBody'];
+    $this->debug = $this->config['debug'];
 
     $this->tracerProvider = Globals::tracerProvider();
 
