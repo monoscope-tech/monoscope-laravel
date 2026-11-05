@@ -6,8 +6,11 @@ use Orchestra\Testbench\TestCase;
 use APIToolkit\Http\Middleware\APIToolkit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Google\Cloud\PubSub\Topic;
 use Mockery;
+use OpenTelemetry\API\Instrumentation\Configurator;
+use OpenTelemetry\SDK\Trace\SpanExporter\InMemoryExporter;
+use OpenTelemetry\SDK\Trace\SpanProcessor\SimpleSpanProcessor;
+use OpenTelemetry\SDK\Trace\TracerProvider;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -111,123 +114,38 @@ class APIToolkitTest extends TestCase
       ->assertJson(json_decode($testJSON, true));
   }
 
-  public function test_empty_redected_json_same_as_input(): void
+  public function test_redacts_headers_and_bodies_from_env_lists(): void
   {
-    $svc = new APIToolkit("");
-    $redactedJSON = $svc->redactJSONFields([], $this->testJSON);
-    $this->assertJsonStringEqualsJsonString($this->testJSON, $redactedJSON);
-  }
-
-  public function test_redacted_field(): void
-  {
-    $testJSON = '
-    { "store": {
-        "book": [
-          { "category": "reference",
-            "author": "Nigel Rees",
-            "title": "Sayings of the Century",
-            "price": 8.95,
-            "available": true
-          },
-          { "category": "fiction",
-            "author": "Evelyn Waugh",
-            "title": "Sword of Honour",
-            "price": 12.99,
-            "available": false
-          }
-        ]
-      }
+    // The documented .env format is a comma-separated string.
+    putenv('APITOOLKIT_REDACT_HEADERS=X-Api-Key, X-Other');
+    putenv('APITOOLKIT_REDACT_REQUEST_BODY=$.password, $.pin');
+    putenv('APITOOLKIT_CAPTURE_REQUEST_BODY=true');
+    $exporter = new InMemoryExporter();
+    $scope = Configurator::create()->withTracerProvider(new TracerProvider(new SimpleSpanProcessor($exporter)))->activate();
+    try {
+      $this->app['router']->post('/login', fn() => response('ok')->cookie('sid', 'secret'))->middleware('apitoolkit');
+      $this->call('POST', '/login', [], [], [], [
+        'HTTP_AUTHORIZATION' => 'Bearer abc',
+        'HTTP_X_API_KEY' => 'key',
+        'HTTP_ACCEPT' => 'text/plain',
+        'CONTENT_TYPE' => 'application/json',
+      ], '{"password":"p","pin":"1","user":"u"}')->assertOk();
+      $attrs = $exporter->getSpans()[0]->getAttributes()->toArray();
+    } finally {
+      $scope->detach();
+      putenv('APITOOLKIT_REDACT_HEADERS');
+      putenv('APITOOLKIT_REDACT_REQUEST_BODY');
+      putenv('APITOOLKIT_CAPTURE_REQUEST_BODY');
     }
-    ';
-    $expectedJSON = '{ "store": {"book": "[CLIENT_REDACTED]"}}';
-    $svc = new APIToolkit("");
-    $redactedJSON = $svc->redactJSONFields(['$.store.book'], $testJSON);
-    $this->assertJsonStringEqualsJsonString($expectedJSON, $redactedJSON);
-  }
-
-  public function test_redacted_array_subfield(): void
-  {
-    $testJSON = '
-    { "store": {
-        "book": [
-          { "category": "reference",
-            "author": "Nigel Rees"
-          },
-          { "category": "fiction",
-            "author": "Evelyn Waugh"
-          }
-        ]
-      }
+    foreach (['request.header.authorization', 'request.header.x-api-key', 'response.header.set-cookie'] as $h) {
+      $this->assertSame('[CLIENT_REDACTED]', $attrs["http.$h"], $h);
     }
-    ';
-    $expectedJSON = '
-    { "store": {
-        "book": [
-          { "category": "[CLIENT_REDACTED]",
-            "author": "Nigel Rees"
-          },
-          { "category": "[CLIENT_REDACTED]",
-            "author": "Evelyn Waugh"
-          }
-        ]
-      }
-    }
-    ';
-    $svc = new APIToolkit("");
-    $redactedJSON = $svc->redactJSONFields(['$.store.book[*].category'], $testJSON);
-    $this->assertJsonStringEqualsJsonString($expectedJSON, $redactedJSON);
+    $this->assertSame('text/plain', $attrs['http.request.header.accept']);
+    $this->assertJsonStringEqualsJsonString('{"password":"[CLIENT_REDACTED]","pin":"[CLIENT_REDACTED]","user":"u"}', base64_decode($attrs['http.request.body']));
   }
 
-  public function test_return_invalid_json_as_is(): void
-  {
-    $testJSON = 'invalid_json';
-    $expectedJSON = 'invalid_json';
-    $svc = new APIToolkit("");
-    $redactedJSON = $svc->redactJSONFields(['$.store.book[*].category'], $testJSON);
-    $this->assertEquals($expectedJSON, $redactedJSON);
-  }
 
-  // Register package service providers
-  protected function getPackageProviders($app)
-  {
-    return [\APIToolkit\Provider\APIToolkitServiceProvider::class];
-  }
 
-  public function testLog()
-  {
-    $request = Request::create('/example', 'GET', [
-      'query_param1' => 'value1',
-      'query_param2' => 'value2',
-    ], [], [], [
-      'HTTP_Custom-Header' => 'CustomValue',
-      'HTTP_Authorization' => 'Bearer blabla',
-    ]);
-    $response = new Response('Body content here', 200, [
-      'Content-Type' => 'application/json',
-      'Custom-Header' => 'CustomValue',
-    ]);
-    $mockedTopic = $this->createMock(Topic::class);
-    $mockedTopic->expects($this->once())
-      ->method('publish')
-      ->with($this->callback(function ($subjectStr) {
-        $data = json_decode($subjectStr['data']);
-        $this->assertEquals($data->status_code, 200);
-        $this->assertEquals($data->method, "GET");
-        $this->assertEquals($data->raw_url, "/example?query_param1=value1&query_param2=value2");
-        $this->assertEquals($data->url_path, "/example?query_param1=value1&query_param2=value2");
-        $this->assertEquals($data->query_params->query_param1, "value1");
-        $this->assertEquals($data->query_params->query_param2, "value2");
-        // $this->assertEquals($data->request_headers->'custom-header'[0], "CustomValue");
-        $this->assertEquals($data->response_body, base64_encode("Body content here"));
-        return isset($subjectStr['data']);
-      }));
 
-    $apiToolkit = new APIToolkit();
-    $apiToolkit->debug = false;
-    $apiToolkit->pubsubTopic = $mockedTopic;
-    $newUuid = Uuid::uuid4();
-    $msg_id = $newUuid->toString();
 
-    $apiToolkit->log($request, $response, hrtime(true), $msg_id);
-  }
 }

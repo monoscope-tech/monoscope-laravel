@@ -3,7 +3,7 @@
 namespace APIToolkit\Http\Middleware;
 
 use Illuminate\Support\Facades\Log;
-use OpenTelemetry\SDK\Trace\TracerProvider;
+use OpenTelemetry\API\Trace\TracerProviderInterface;
 use OpenTelemetry\API\Globals;
 use Illuminate\Http\Request;
 use Closure;
@@ -21,16 +21,17 @@ class APIToolkit
   private ?string $serviceVersion;
   private ?string $serviceName;
   private array $tags = [];
-  private TracerProvider $tracerProvider;
+  private TracerProviderInterface $tracerProvider;
 
   public function __construct()
   {
-    $this->tags = array_map('trim', explode(",", env('APITOOLKIT_TAGS', "")));
+    $list = fn($key) => array_values(array_filter(array_map('trim', explode(",", env($key, "")))));
+    $this->tags = $list('APITOOLKIT_TAGS');
     $this->serviceVersion = env('APITOOLKIT_SERVICE_VERSION', null);
     $this->serviceName = env('APITOOLKIT_SERVICE_NAME', "");
-    $this->redactHeaders = env('APITOOLKIT_REDACT_HEADERS', []);
-    $this->redactRequestBody = env('APITOOLKIT_REDACT_REQUEST_BODY', []);
-    $this->redactResponseBody = env('APITOOLKIT_REDACT_RESPONSE_BODY', []);
+    $this->redactHeaders = $list('APITOOLKIT_REDACT_HEADERS');
+    $this->redactRequestBody = $list('APITOOLKIT_REDACT_REQUEST_BODY');
+    $this->redactResponseBody = $list('APITOOLKIT_REDACT_RESPONSE_BODY');
     $this->captureRequestBody = env('APITOOLKIT_CAPTURE_REQUEST_BODY', false);
     $this->captureResponseBody = env('APITOOLKIT_CAPTURE_RESPONSE_BODY', false);
     $this->debug = env('APITOOLKIT_DEBUG', false);
